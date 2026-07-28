@@ -1,5 +1,7 @@
-ws/build/
-ws/install/
-ws/log/
+*build/
+*install/
+*log/
 
 *.log
+
+__pycache__/

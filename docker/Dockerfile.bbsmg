@@ -1,0 +1,18 @@
+FROM python:3.10-slim
+
+ARG USERNAME=user
+ARG USERID=1000
+ARG USERGID=${USERID}
+
+ENV PYTHONPATH=/BBSMG_ws
+ENV TERM=xterm-256color
+
+COPY BBSMG_ws/requirements.txt /tmp/requirements.txt
+RUN pip install --no-cache-dir -r /tmp/requirements.txt
+RUN groupadd --gid ${USERGID} ${USERNAME} \
+    && useradd --uid ${USERID} --gid ${USERGID} -m ${USERNAME} -s /bin/bash
+
+USER ${USERNAME}
+WORKDIR /BBSMG_ws
+
+CMD ["bash"]

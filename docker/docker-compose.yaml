@@ -1,4 +1,22 @@
 services:
+  bbsmg:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.bbsmg
+    image: bbsmg-phase1:latest
+    container_name: bbsmg_phase1
+    command: /bin/bash
+    tty: true
+    network_mode: host
+    stdin_open: true
+    stop_grace_period: 1s
+
+    volumes:
+      - ../BBSMG_ws:/BBSMG_ws
+
+    working_dir:
+      /BBSMG_ws
+
   gpa:
     build: .
     image: gpa:latest
@@ -12,7 +30,7 @@ services:
     stop_grace_period: &STOP_GRACE_PERIOD 1s
 
     volumes:
-      - ../ws:/home/user/ws
+      - ../ros2ws:/home/user/ws
       - /tmp/.X11-unix:/tmp/.X11-unix
       - $HOME/.Xauthority:/home/user/.Xauthority
       - /dev:/dev

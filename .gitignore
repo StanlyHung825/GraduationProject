@@ -6,4 +6,6 @@
 
 __pycache__/
 plan/
-.vscode
+.vscode/
+samples/
+out/

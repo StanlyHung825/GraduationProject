@@ -53,11 +53,10 @@ class SinglePointStroke:
 
 @dataclass(frozen=True)
 class RenderConfig:
-    width: int = 512
-    height: int = 512
-    scale: float = 100.0
+    width: int = 1024
+    height: int = 1024
+    scale: float = 200.0
     samples_per_curve: int = 32
-    padding_px: int = 32
 
 
 def estimate_stroke_shape(brush: BrushControl) -> StrokeShape:
@@ -159,29 +158,36 @@ def write_debug_json(stroke: SinglePointStroke, config: RenderConfig, path: Path
 
 def load_single_point_input(path: Path) -> tuple[Point2D, BrushControl, RenderConfig]:
     data = json.loads(path.read_text(encoding="utf-8"))
-    brush_data = _required(data, "brush")
-    render_data = data.get("render", {})
     return (
         Point2D(float(_required(data, "x")), float(_required(data, "y"))),
-        BrushControl(
-            h=float(_required(brush_data, "h")),
-            alpha=float(_required(brush_data, "alpha")),
-            beta=float(_required(brush_data, "beta")),
-        ),
-        RenderConfig(
-            width=int(render_data.get("width", RenderConfig.width)),
-            height=int(render_data.get("height", RenderConfig.height)),
-            scale=float(render_data.get("scale", RenderConfig.scale)),
-            samples_per_curve=int(render_data.get("samples_per_curve", RenderConfig.samples_per_curve)),
-            padding_px=int(render_data.get("padding_px", RenderConfig.padding_px)),
-        ),
+        load_brush(_required(data, "brush")),
+        load_render_config(data.get("render", {})),
+    )
+
+
+def load_brush(data: Any) -> BrushControl:
+    if data is None:
+        raise ValueError("missing required field: brush")
+    return BrushControl(
+        h=float(_required(data, "h")),
+        alpha=float(_required(data, "alpha")),
+        beta=float(_required(data, "beta")),
+    )
+
+
+def load_render_config(data: dict[str, Any]) -> RenderConfig:
+    return RenderConfig(
+        width=int(data.get("width", RenderConfig.width)),
+        height=int(data.get("height", RenderConfig.height)),
+        scale=float(data.get("scale", RenderConfig.scale)),
+        samples_per_curve=int(data.get("samples_per_curve", RenderConfig.samples_per_curve)),
     )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path, required=True)
-    parser.add_argument("--out-dir", type=Path, default=Path("BBSMG_ws/out/phase1"))
+    parser.add_argument("--out-dir", type=Path, default=Path("out/single_point"))
     args = parser.parse_args()
 
     origin, brush, config = load_single_point_input(args.input)

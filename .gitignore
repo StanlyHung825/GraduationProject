@@ -9,3 +9,7 @@ plan/
 .vscode/
 samples/
 out/
+
+# B-BSMG examples are inputs and must remain reproducible.
+!BBSMG_ws/samples/
+!BBSMG_ws/samples/**

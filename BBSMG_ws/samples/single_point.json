@@ -1,0 +1,15 @@
+{
+  "x": 0.0,
+  "y": 0.0,
+  "brush": {
+    "h": 11.0,
+    "alpha": 0.0,
+    "beta": 0.0
+  },
+  "render": {
+    "width": 1024,
+    "height": 1024,
+    "scale": 200.0,
+    "samples_per_curve": 32
+  }
+}

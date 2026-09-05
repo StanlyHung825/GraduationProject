@@ -18,19 +18,23 @@ from bbsmg.single_point import (  # noqa: E402
     BrushControl,
     Point2D,
     RenderConfig,
-    render_stroke_mask,
+    load_brush,
+    load_render_config,
     sample_single_point_stroke,
 )
+
+IMAGE_SIZE = 1024
 
 
 def render_character_from_waypoints(path: Path) -> tuple[np.ndarray, list[dict[str, Any]]]:
     waypoints, config = load_waypoint_input(path)
-    image = np.zeros((config.height, config.width), dtype=np.uint8)
+    image = np.zeros((IMAGE_SIZE, IMAGE_SIZE), dtype=np.uint8)
     debug = []
 
     for origin, brush in waypoints:
         stroke = sample_single_point_stroke(origin, brush, config.samples_per_curve)
-        image = np.maximum(image, render_stroke_mask(stroke, config))
+        contour = np.rint([(point.x, point.y) for point in stroke.contour]).astype(np.int32)
+        cv2.fillPoly(image, [contour], 255)
         debug.append(
             {
                 "origin": asdict(origin),
@@ -41,6 +45,13 @@ def render_character_from_waypoints(path: Path) -> tuple[np.ndarray, list[dict[s
         )
 
     return image, debug
+
+
+def normalized_pixel_difference(simulated: np.ndarray, target: np.ndarray) -> float:
+    if simulated.shape != target.shape:
+        raise ValueError(f"image shapes must match: {simulated.shape} != {target.shape}")
+    difference = np.abs(simulated.astype(np.float32) - target.astype(np.float32))
+    return float(difference.mean() / 255.0)
 
 
 def load_waypoint_input(path: Path) -> tuple[list[tuple[Point2D, BrushControl]], RenderConfig]:
@@ -56,53 +67,45 @@ def load_waypoint_input(path: Path) -> tuple[list[tuple[Point2D, BrushControl]],
         waypoints.append(
             (
                 Point2D(float(_required(point, "x")), float(_required(point, "y"))),
-                _load_brush(point.get("brush", default_brush)),
+                load_brush(point.get("brush", default_brush)),
             )
         )
     if not waypoints:
         raise ValueError("waypoints must not be empty")
 
-    render = data.get("render", {})
-    return (
-        waypoints,
-        RenderConfig(
-            width=int(render.get("width", RenderConfig.width)),
-            height=int(render.get("height", RenderConfig.height)),
-            scale=float(render.get("scale", RenderConfig.scale)),
-            samples_per_curve=int(render.get("samples_per_curve", RenderConfig.samples_per_curve)),
-            padding_px=int(render.get("padding_px", RenderConfig.padding_px)),
-        ),
-    )
+    return waypoints, load_render_config(data.get("render", {}))
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path, required=True)
-    parser.add_argument("--out-dir", type=Path, default=Path("BBSMG_ws/out/phase1"))
+    parser.add_argument("--out-dir", type=Path, default=Path("out/character"))
+    parser.add_argument("--output-name", help="output filename without extension")
+    parser.add_argument("--debug", action="store_true", help="write stroke debug JSON")
+    parser.add_argument("--target", type=Path, help="white-ink-on-black grayscale reference image")
     args = parser.parse_args()
 
     image, debug = render_character_from_waypoints(args.input)
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    image_path = args.out_dir / "character_simulation.png"
-    debug_path = args.out_dir / "character_simulation_debug.json"
+    output_name = args.output_name or f"{args.input.stem}_sim"
+    image_path = args.out_dir / f"{output_name}.png"
     cv2.imwrite(str(image_path), image)
-    debug_path.write_text(json.dumps({"strokes": debug}, indent=2) + "\n", encoding="utf-8")
 
     print(f"input={args.input}")
     print(f"image={image_path}")
-    print(f"debug={debug_path}")
+    if args.debug:
+        debug_path = args.out_dir / f"{output_name}_debug.json"
+        debug_path.write_text(json.dumps({"strokes": debug}, indent=2) + "\n", encoding="utf-8")
+        print(f"debug={debug_path}")
     print(f"stroke_count={len(debug)}")
+    if args.target:
+        target = cv2.imread(str(args.target), cv2.IMREAD_GRAYSCALE)
+        if target is None:
+            raise ValueError(f"failed to read target image: {args.target}")
+        difference = normalized_pixel_difference(image, target)
+        print(f"pixel_difference={difference:.6f}")
+        print(f"pixel_score={1.0 - difference:.6f}")
     return 0
-
-
-def _load_brush(data: Any) -> BrushControl:
-    if data is None:
-        raise ValueError("missing required field: brush")
-    return BrushControl(
-        h=float(_required(data, "h")),
-        alpha=float(_required(data, "alpha")),
-        beta=float(_required(data, "beta")),
-    )
 
 
 def _required(data: dict[str, Any], key: str) -> Any:
